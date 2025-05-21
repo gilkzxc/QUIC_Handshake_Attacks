@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 from scapy.all import *
 load_contrib("quic")
@@ -20,10 +20,15 @@ def handle_quic(pkt):
             print(f"  - TokenLength   : {qi.TokenLen}")
             print(f"  - PacketNumber  : {qi.PacketNumber}")
             print(f"  - PayloadLength : {qi.Length}")
+            print(f"  - SrcIP         : {pkt[IP].src}")
+            print(f"  - DestIP        : {pkt[IP].dst}")
+            print(f"  - SrcPort       : {pkt[UDP].sport}")
+            print(f"  - DestPort      : {pkt[UDP].dport}")
+
             # Raw (still encrypted) payload bytes
             raw = bytes(qi.payload)
             #print(f"  - Encrypted payload (first 32B): {raw[:32].hex()}…")
-            if input("Enter 'yes' to attack!: ") == "yes":
+            if True :# input("Enter 'yes' to attack!: ") == "yes":
                 """if pkt.sniffed_on == 'middlebox-eth0':
                     print(Fore.GREEN + pkt.summary())
                     ports[pkt[TCP].sport] = pkt[IP].src
@@ -75,7 +80,7 @@ def handle_quic(pkt):
 
 # Sniff UDP 443 traffic and invoke handle_quic for each packet
 sniff(
-    #iface="Ethernet 2",
+    #iface="VMware Network Adapter VMnet8",
     #filter="udp port 443",
     prn=handle_quic,         # callback for every packet
     store=False                  # don’t keep packets in memory

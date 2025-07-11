@@ -4,8 +4,13 @@ load_contrib("quic")
 from scapy.layers.quic import *
 from quic_crypto import *
 
+LONG_HEADER_TYPES = {"Initial":{"V1":0b00, "V2":0b01}, 
+               "0-RTT":{"V1":0b01, "V2":0b10},
+               "Handshake":{"V1":0b10, "V2":0b11},
+               "Retry":{"V1":0b11, "V2":0b00}} 
 
-
+VERSION = {"int":{"V1":0x00000001, "V2":0x6b3343cf},
+           "bytes":{"V1":b'\x00\x00\x00\x01', "V2":b'\x6b\x33\x43\xcf'}}
 
 def _patch_length_in_initial(buf: bytearray,
                              token_len: int,

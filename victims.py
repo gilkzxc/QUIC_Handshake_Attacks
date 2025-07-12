@@ -49,7 +49,7 @@ class Victim:
     def __str__(self):
         result = f"║ {ipv4_to_3_zero_digits_padded_octets(self.src)}  ║                                                                           ║ [{bool_value_print(self.status['DoS'])}] ║      [{bool_value_print(self.status['Session Hijack'])}]       ║     [{bool_value_print(self.status['Transparent'])}]      ║\n"
         for dest_ip in self.destinations:
-            result += f"║                  ║  • {ipv4_to_3_zero_digits_padded_octets(self.src)}                                                        ║ [{bool_value_print(self.destinations[dest_ip]['DoS'])}] ║      [{bool_value_print(self.destinations[dest_ip]['Session Hijack'])}]       ║     [{bool_value_print(self.destinations[dest_ip]['Transparent'])}]      ║\n"
+            result += f"║                  ║  • {ipv4_to_3_zero_digits_padded_octets(dest_ip)}                                                        ║ [{bool_value_print(self.destinations[dest_ip]['DoS'])}] ║      [{bool_value_print(self.destinations[dest_ip]['Session Hijack'])}]       ║     [{bool_value_print(self.destinations[dest_ip]['Transparent'])}]      ║\n"
         return result
 
     def attack(self, attack_type: str = "DoS", target_ip: str = APPLAY_ON_VICTIM):

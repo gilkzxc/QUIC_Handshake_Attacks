@@ -5,6 +5,9 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from scapy.layers.inet import IP, UDP
 from scapy.all import Raw
 from typing import Tuple
+from quic_protected import *
+from quic_crypto import *
+
 _SALT_V1 = bytes.fromhex("38762cf7f55934b34d179ae6a4c80cadccbb7f0a")
 
 def _encode_varint_2(value: int) -> bytes:        # 2-byte QUIC varint
@@ -17,18 +20,23 @@ def forge_cc_scapy(
         tpl: Tuple[str,int,str,int],
         frame: bytes,
         pn: int = 0) -> Raw:
-
+    """
     hk   = TLS13_HKDF()
     init = hk.extract(_SALT_V1, dcid_secret)                                # RFC 9001 §5.2 :contentReference[oaicite:5]{index=5}
     ssec = hk.expand_label(init, b"server in", b"", 32)
     key  = hk.expand_label(ssec, b"quic key", b"", 16)
     iv   = hk.expand_label(ssec, b"quic iv",  b"", 12)
-    hp   = hk.expand_label(ssec, b"quic hp",  b"", 16)
+    hp   = hk.expand_label(ssec, b"quic hp",  b"", 16)"""
+    key, iv, hp = derive_initial_keys(dcid_secret,is_server=True,version="V2")
 
     aead = AESGCM(key)
 
     # --- build header up to PN ------------------------------------
-    hdr  = bytearray(b"\xc3\x00\x00\x00\x01")          # flags + version
+    #hdr  = bytearray(b"\xc3\x00\x00\x00\x01")          # flags + version
+    #hdr = bytearray(b"\xc3")
+    hdr = bytearray(b"\xd3")
+    #hdr += VERSION["bytes"]["V1"]
+    hdr += VERSION["bytes"]["V2"]
     hdr += bytes([len(dcid_header)]) + dcid_header     # DCID
     hdr += b"\x00"                                     # SCID length = 0
     hdr += b"\x00"                                    # Token length  = 0  ← NEW

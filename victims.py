@@ -69,6 +69,8 @@ class Victim:
         if target_ip == APPLAY_ON_VICTIM:
             # Release Victim / be invisible to victim.
             self.status = passive_status()
+            for dest_ip in self.destinations:
+                self.destinations[dest_ip].update(passive_status())
             return True
         if target_ip in self:
             # Release specific "route".

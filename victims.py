@@ -86,6 +86,7 @@ class Victims:
 
     def __init__(self):
         self.victims = {}
+        self.exit = False
 
     def __contains__(self, victim_ip):
         return victim_ip in self.victims
@@ -146,6 +147,8 @@ class Victims:
                                         choices=["attack", "passive", "quit"]).ask()
                 if cmd in ("q", "quit"):
                     os._exit(0)
+                    #self.exit=True
+                    #return
                 chosen_victim = questionary.select("Choose victim for action change. >>", choices=self.victims.keys()).ask()
 
                 if self.victims[chosen_victim].destinations == {}:

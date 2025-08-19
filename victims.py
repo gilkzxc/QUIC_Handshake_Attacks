@@ -4,6 +4,8 @@ import questionary
 import os
 from time import sleep
 from scapy.all import *
+from ipaddress import IPv4Address
+
 
 APPLAY_ON_VICTIM = "All destinations"
 ATTACK_TYPES = ["DoS", "Session Hijack"]
@@ -87,6 +89,7 @@ class Victims:
     def __init__(self):
         self.victims = {}
         self.exit = False
+        
 
     def __contains__(self, victim_ip):
         return victim_ip in self.victims

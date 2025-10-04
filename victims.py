@@ -114,6 +114,11 @@ class Victims:
                 if self.victims[src_ip][dest_ip]["sport"] == dport_from_wan:
                     return src_ip
         return ""
+    def find_victim_from_wan(self, dest_ip_from_wan, dport_from_wan):
+        for src_ip in self.victims:
+            if dest_ip_from_wan in self.victims[src_ip] and self.victims[src_ip][dest_ip_from_wan]["sport"] == dport_from_wan:
+                return src_ip
+        return ""
 
 
     def update(self, pkt):

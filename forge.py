@@ -1,4 +1,4 @@
-# forge2.py  –– drop-in replacement
+
 from scapy.layers.tls.crypto.hkdf import TLS13_HKDF
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes

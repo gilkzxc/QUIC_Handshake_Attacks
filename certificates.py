@@ -73,7 +73,7 @@ class Cert:
             .add_extension(
                 x509.SubjectAlternativeName([
                     x509.DNSName(u"cookies.local"),  # Add alternative names if needed
-                    x509.IPAddress(ipaddress.IPv4Address("192.168.0.10")),  # Your local IP
+                    x509.IPAddress(ipaddress.IPv4Address("192.168.227.128")),  # Your local IP
                 ]),
                 critical=False,
             )
@@ -92,3 +92,7 @@ class Cert:
             f.write(web_cert.public_bytes(serialization.Encoding.PEM))
 
         return {"key":web_key, "cert":web_cert, "subject":web_subject}
+
+if __name__ == "__main__":
+    test = Cert()
+    test.leaf()

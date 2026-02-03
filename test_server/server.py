@@ -9,6 +9,7 @@ from aioquic.h3.connection import H3_ALPN, H3Connection
 from aioquic.h3.events import H3Event, HeadersReceived
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import ProtocolNegotiated, QuicEvent
+from aioquic.quic.packet import QuicErrorCode
 
 class IndexOnlyProtocol(QuicConnectionProtocol):
     def __init__(self, *args, index_path: Path, **kwargs) -> None:
@@ -19,11 +20,19 @@ class IndexOnlyProtocol(QuicConnectionProtocol):
     def quic_event_received(self, event: QuicEvent) -> None:
         # Initialize HTTP/3 once QUIC/TLS parameters are negotiated
         if isinstance(event, ProtocolNegotiated):
-            self._http = H3Connection(self._quic)
+            #self._http = H3Connection(self._quic)
+            #Start Task 3.1 - Before TLS Handshake or overwrites TLS handshake, so we get long header but we can't decipher with Wireshark #
+            #self.close(error_code=QuicErrorCode.APPLICATION_ERROR, reason_phrase='Testing AIOQUIC Connection Close2')
+            #End Task 3.1 - Makes client app frozen #
             return
 
         if self._http is None:
             return
+        
+        #Start Task 3 - After TLS handshake - Thus short header version. NOT WHAT WE WANT. #
+        self.close(error_code=QuicErrorCode.APPLICATION_ERROR, reason_phrase='Testing AIOQUIC Connection Close')
+        return
+        #End Task 3 - Client app closes as should've been#
 
         # Let aioquic translate QUIC events into HTTP/3 events
         for h3_event in self._http.handle_event(event):

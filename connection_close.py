@@ -24,3 +24,13 @@ class QUIC_CONNECTION_CLOSE(Packet):
         QuicVarLenField("reason_length", None, length_of="reason_phrase"),
         StrLenField("reason_phrase", b"", length_from=lambda pkt:pkt.reason_length),
     ]
+
+
+class QUIC_CONNECTION_CLOSE_0x1C_PAYLOAD(Packet):
+    name = "QUIC CONNECTION_CLOSE (0x1c payload only)"
+    fields_desc = [
+        QuicVarIntField("error_code", 0),
+        QuicVarIntField("frame_type", 0),  # required for 0x1c :contentReference[oaicite:4]{index=4}
+        QuicVarLenField("reason_length", None, length_of="reason_phrase"),
+        StrLenField("reason_phrase", b"", length_from=lambda pkt: pkt.reason_length),
+    ]

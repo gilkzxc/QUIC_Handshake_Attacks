@@ -3,7 +3,7 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from datetime import datetime, timedelta, timezone
-import ipaddress
+from ipaddress import IPv4Address
 
 class Cert:
     def __init__(self, assymetric_algorithm = rsa, a_a_parameters = {"public_exponent":65537, "key_size":2048}):
@@ -47,14 +47,14 @@ class Cert:
         self.cert = ca_cert
         self.subject = ca_subject
 
-    def leaf(self, assymetric_algorithm = rsa, a_a_parameters = {"public_exponent":65537, "key_size":2048}):
+    def leaf(self, target_url, target_ip: IPv4Address, carried_ip: IPv4Address, assymetric_algorithm = rsa, a_a_parameters = {"public_exponent":65537, "key_size":2048}):
 
         # Generate website private key
         web_key = assymetric_algorithm.generate_private_key(**a_a_parameters)
 
         # CSR (Certificate Signing Request)
         web_subject = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, u"cookies.local"),  # Use your local domain/IP
+            x509.NameAttribute(NameOID.COMMON_NAME, target_url),  # Use your local domain/IP
         ])
 
         csr = x509.CertificateSigningRequestBuilder().subject_name(
@@ -72,8 +72,9 @@ class Cert:
             .not_valid_after(datetime.now(timezone.utc) + timedelta(days=825))
             .add_extension(
                 x509.SubjectAlternativeName([
-                    x509.DNSName(u"cookies.local"),  # Add alternative names if needed
-                    x509.IPAddress(ipaddress.IPv4Address("192.168.227.128")),  # Your local IP
+                    x509.DNSName(target_url),  # Add alternative names if needed
+                    x509.IPAddress(target_ip),  # Server IP
+                    x509.IPAddress(carried_ip),  #Additional IP
                 ]),
                 critical=False,
             )
@@ -81,18 +82,19 @@ class Cert:
         )
 
         # Save website key and cert
-        with open("web_key.pem", "wb") as f:
+        with open(f"web_key.pem", "wb") as f:
             f.write(web_key.private_bytes(
                 serialization.Encoding.PEM,
                 serialization.PrivateFormat.TraditionalOpenSSL,
                 serialization.NoEncryption()  # Use encryption if desired
             ))
 
-        with open("web_cert.pem", "wb") as f:
+        with open(f"web_cert.pem", "wb") as f:
             f.write(web_cert.public_bytes(serialization.Encoding.PEM))
 
         return {"key":web_key, "cert":web_cert, "subject":web_subject}
 
 if __name__ == "__main__":
+    # Test scenario
     test = Cert()
-    test.leaf()
+    test.leaf(u"cookies.local",IPv4Address("10.69.1.100"), IPv4Address("192.168.1.1"))

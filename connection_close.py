@@ -1,6 +1,6 @@
-from scapy.all import Packet, StrLenField, ConditionalField, bind_layers
+from scapy.all import Packet, StrLenField, ConditionalField
 
-from scapy.layers.quic import _quic_payloads, QuicVarIntField, QuicVarEnumField, QuicVarLenField
+from quic_extend import _quic_payloads, QuicVarIntField, QuicVarEnumField, QuicVarLenField
 
 """
     In latest scapy/layers/quic.py version, 0x1D is missing from payload table.

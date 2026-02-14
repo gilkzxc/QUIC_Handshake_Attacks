@@ -1,7 +1,8 @@
-from scapy.all import *
-load_contrib("quic")
+#from scapy.all import *
+#load_contrib("quic")
 
-from scapy.layers.quic import *
+#from scapy.layers.quic import *
+from quic_extend import *
 from quic_crypto import *
 
 LONG_HEADER_TYPES = {"Initial":{"V1":0b00, "V2":0b01}, 

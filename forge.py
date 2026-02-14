@@ -13,6 +13,7 @@ from aioquic.quic.crypto import CryptoPair
 from aioquic.quic.packet import QuicPacketType
 from aioquic.quic.packet_builder import QuicPacketBuilder
 from connection_close import QUIC_CONNECTION_CLOSE_0x1C_PAYLOAD
+from aioquic.quic.packet import QuicProtocolVersion
 import os
 
 def _encode_varint_2(value: int) -> bytes:        # 2-byte QUIC varint
@@ -103,7 +104,7 @@ def forge_cc_scapy(
             Raw(protected_pkt))
 
 
-def forge_cc_2(tpl: Tuple[str,int,str,int], client_scid: bytes, client_dcid: bytes, version: int):
+def forge_cc_2(tpl: Tuple[str,int,str,int], client_scid: bytes, client_dcid: bytes, version: QuicProtocolVersion):
 
     # 1) Choose the server's Source CID (SCID) for the response
     server_scid = os.urandom(8)
@@ -129,7 +130,7 @@ def forge_cc_2(tpl: Tuple[str,int,str,int], client_scid: bytes, client_dcid: byt
     cc = QUIC_CONNECTION_CLOSE_0x1C_PAYLOAD(
         error_code=0x10,
         frame_type=0,
-        reason_phrase=b"oops!"
+        reason_phrase=f"oops! ver={version.name}"
     )
     frame  = bytes(cc)
 

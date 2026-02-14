@@ -3,7 +3,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 import questionary
 import os
 from time import sleep
-from scapy.all import *
+from scapy.all import IP, UDP
 from ipaddress import IPv4Address
 
 

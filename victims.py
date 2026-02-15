@@ -154,6 +154,7 @@ class Victims:
                 cmd = questionary.select("middlebox is online, chose your action. > ",
                                         choices=["attack", "passive", "quit"]).ask()
                 if cmd in ("q", "quit"):
+                    os.system('sysctl -w net.ipv4.ip_forward=1')
                     os._exit(0)
                     #self.exit=True
                     #return

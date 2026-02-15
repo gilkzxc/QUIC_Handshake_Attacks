@@ -102,6 +102,7 @@ if __name__ == "__main__":
     """
         Global variables, constants and configurations settings.
     """
+    # Maybe turnning off ip_forward is not needed, but it let's a race between kernel to attacker_main2.py . (Need more testing.)
     os.system('sysctl -w net.ipv4.ip_forward=0')    # Set middlebox kernel ipv4 forwarding cancelled. So only user space forwarding.
     parser = argparse.ArgumentParser(description="MiTM QUIC Handshake attacks")
     parser.add_argument(
@@ -136,12 +137,14 @@ if __name__ == "__main__":
         attacker_inner_iface_ip = IPv4Address(args.inner_iface_ip)
     except Exception as e:
         print(e)
+        os.system('sysctl -w net.ipv4.ip_forward=1')
         os._exit(1)
     outer_iface = args.outer_iface
     try:
         attacker_outer_iface_ip = IPv4Address(args.outer_iface_ip)
     except Exception as e:
         print(e)
+        os.system('sysctl -w net.ipv4.ip_forward=1')
         os._exit(1)
     vs = Victims()
     #print(f"Inner_iface: {inner_iface} , Outer_iface: {outer_iface}")      
@@ -163,5 +166,6 @@ if __name__ == "__main__":
                 os.kill(p.pid, signal.SIGKILL)  # Unix-only sledgehammer
                 p.join()"""
             control_panel_thread.join()
+    os.system('sysctl -w net.ipv4.ip_forward=1')
 
         

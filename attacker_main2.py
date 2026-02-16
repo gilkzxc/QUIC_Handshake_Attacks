@@ -74,7 +74,7 @@ def handle_quic(pkt):
                     send(new_pkt, iface=inner_iface, verbose=False)
                     print("Sent shit")
                     return
-                 elif (vs[pkt[IP].src].status["Transparent"] or vs[pkt[IP].src][pkt[IP].dst]["Transparent"]):
+                elif (vs[pkt[IP].src].status["Transparent"] or vs[pkt[IP].src][pkt[IP].dst]["Transparent"]):
                     add_and_send_to_server(pkt)
                     return
             add_and_send_to_server(pkt)

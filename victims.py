@@ -11,7 +11,7 @@ APPLAY_ON_VICTIM = "All destinations"
 ATTACK_TYPES = ["DoS", "Session Hijack"]
 
 def ipv4_to_3_zero_digits_padded_octets(ip_addr):
-    return '.'.join(f"{int(o):03d}" for o in ip_addr.split('.'))
+    return '.'.join(f"{int(o):03d}" for o in str(ip_addr).split('.'))
 
 
 def bool_value_print(b):

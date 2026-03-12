@@ -106,15 +106,11 @@ def forge_cc_scapy(
 
 def forge_cc_2(tpl: Tuple[str,int,str,int], client_scid: bytes, client_dcid: bytes, version: QuicProtocolVersion):
 
-    # 1) Choose the server's Source CID (SCID) for the response
     server_scid = os.urandom(8)
 
-    # 2) Derive Initial keys from the client's *first Initial* DCID
     crypto = CryptoPair()
     crypto.setup_initial(client_dcid, is_client=False, version=version)
 
-    # 3) Build a server Initial:
-    #    DCID = client_scid, SCID = server_scid
     builder = QuicPacketBuilder(
         is_client=False,
         version=version,
@@ -124,23 +120,18 @@ def forge_cc_2(tpl: Tuple[str,int,str,int], client_scid: bytes, client_dcid: byt
         peer_token=b"",           # server Initial normally has empty token
         packet_number=0,
     )
-
     builder.start_packet(QuicPacketType.INITIAL, crypto)
-
     cc = QUIC_CONNECTION_CLOSE_0x1C_PAYLOAD(
         error_code=0x10,
         frame_type=0,
         reason_phrase=f"oops! ver={version.name}"
     )
     frame  = bytes(cc)
-
     buf = builder.start_frame(0x1C, capacity=1 + len(frame)) # 0x1C is for transport close
     buf.push_bytes(frame)
-
     datagrams, _packets = builder.flush()
     if len(datagrams) == 1:
         return (IP(src=tpl[2], dst=tpl[0]) /
             UDP(sport=tpl[3], dport=tpl[1]) /
             Raw(datagrams[0]))
-    print("Shit happens")
     return None

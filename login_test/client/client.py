@@ -14,7 +14,7 @@ from aioquic.h3.connection import H3_ALPN, H3Connection
 from aioquic.h3.events import DataReceived, H3Event, HeadersReceived
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import ProtocolNegotiated, QuicEvent
-
+from aioquic.quic.packet import QuicProtocolVersion
 
 # -----------------------------
 # HTML form parser (local file)
@@ -273,6 +273,12 @@ async def run_client(args: argparse.Namespace) -> None:
     if args.ca_file:
         config.load_verify_locations(args.ca_file)
 
+    # QUIC v2 only (no v1 fallback)
+    if args.run_v2:
+        config.original_version = QuicProtocolVersion.VERSION_2
+        config.supported_versions = [
+            QuicProtocolVersion.VERSION_2
+        ]
     async with connect(
         args.host,
         args.port,
@@ -333,6 +339,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--ca-file",
         default=None,
         help="CA/cert file to trust when using --verify",
+    )
+
+    p.add_argument(
+        "--run-v2",
+        action="store_true",
+        help="Run with QUIC v2 only (disable QUIC v1 fallback)",
     )
     return p
 

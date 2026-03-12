@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mock Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 360px;
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 20px;
+    }
+    .hint {
+      margin: 0 0 16px;
+      color: #666;
+      font-size: 13px;
+    }
+    label {
+      display: block;
+      margin: 10px 0 6px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #cfd6dd;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    button {
+      width: 100%;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 8px;
+      background: #1f6feb;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.95; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Mock Login</h1>
+    <p class="hint">Local test page (for your own network/testing only).</p>
+
+    <form method="post" action="/">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required />
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+      <button type="submit">Log in</button>
+    </form>
+  </div>
+</body>
+</html>

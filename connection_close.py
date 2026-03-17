@@ -16,15 +16,19 @@ _quic_payloads[0x1D] = "CONNECTION_CLOSE"
     CONNECTION_CLOSE Frame class:
         
 """
+#RFC9000 sect 19.19
 class QUIC_CONNECTION_CLOSE(Packet):
-    name = "QUIC CONNECTION_CLOSE"
+    name = "QUIC - CONNECTION_CLOSE"
     fields_desc = [
-        QuicVarEnumField("type", 0x1C, {0x1C:"CONNECTION_CLOSE", 0x1D:"APPLICATION_CLOSE"}),
-        QuicVarIntField ("error_code",0), ConditionalField(QuicVarIntField("frame_type", 0), lambda pkt: pkt.type == 0x1C),
+        QuicVarEnumField("type", 0x1C, {
+            0x1C: "CONNECTION_CLOSE",  # transport variant
+            0x1D: "CONNECTION_CLOSE",  # application variant
+        }),
+        QuicVarIntField("error_code", 0),
+        ConditionalField(QuicVarIntField("frame_type", 0), lambda pkt: pkt.type == 0x1C), # Exists only to 0x1C variants.
         QuicVarLenField("reason_length", None, length_of="reason_phrase"),
-        StrLenField("reason_phrase", b"", length_from=lambda pkt:pkt.reason_length),
+        StrLenField("reason_phrase", b"", length_from=lambda pkt: pkt.reason_length),
     ]
-
 
 class QUIC_CONNECTION_CLOSE_0x1C_PAYLOAD(Packet):
     name = "QUIC CONNECTION_CLOSE (0x1c payload only)"

@@ -214,14 +214,15 @@ class QUIC(Packet):
                     return QUIC_Version
                 else:
                     typ = (hdr & 0x30) >> 4
-                    ver = struct.unpack("!I", _pkt[1:5])[0] if len(_pkt) >= 5 else QUIC_V1     # Extracting version constant. RFC8999 5.1 Figure 2 && RFC9000 17.2
-                    typ_in_name = _quic_long_pkttyp_v2.get(typ, "Initial") if ver == QUIC_V2 else _quic_long_pkttyp_v1.get(typ, "Initial") # Default version 1, and match as well for version 2.
+                    # Extracting version constant. RFC8999 5.1 Figure 2 && RFC9000 17.2
+                    ver = struct.unpack("!I", _pkt[1:5])[0] if len(_pkt) >= 5 else QUIC_V1
+                    # Default version 1, and match as well for version 2.
+                    typ_in_name = _quic_long_pkttyp_v2.get(typ, "Initial") if ver == QUIC_V2 else _quic_long_pkttyp_v1.get(typ, "Initial")
                     return  class_by_name_type.get(typ_in_name, QUIC_Initial)
             else:
                 # Short Header packets
                 return QUIC_1RTT
         return QUIC_Initial
-
     def mysummary(self):
         return self.name
 

